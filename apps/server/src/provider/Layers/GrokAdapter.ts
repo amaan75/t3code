@@ -48,7 +48,7 @@ import {
   ProviderAdapterSessionNotFoundError,
   ProviderAdapterValidationError,
 } from "../Errors.ts";
-import { mapAcpToAdapterError } from "../acp/AcpAdapterSupport.ts";
+import { mapAcpToAdapterError, selectAcpPermissionOptionId } from "../acp/AcpAdapterSupport.ts";
 import type * as AcpSessionRuntime from "../acp/AcpSessionRuntime.ts";
 import {
   makeAcpAssistantItemEvent,
@@ -56,6 +56,7 @@ import {
   makeAcpPlanUpdatedEvent,
   makeAcpRequestOpenedEvent,
   makeAcpRequestResolvedEvent,
+  makeAcpTokenUsageEvent,
   makeAcpToolCallEvent,
 } from "../acp/AcpCoreRuntimeEvents.ts";
 import { parsePermissionRequest } from "../acp/AcpRuntimeModel.ts";
@@ -280,38 +281,16 @@ function parseGrokResume(raw: unknown): { sessionId: string } | undefined {
   return { sessionId: raw.sessionId.trim() };
 }
 
-export function selectGrokPermissionOptionId(
-  request: EffectAcpSchema.RequestPermissionRequest,
-  decision: Exclude<ProviderApprovalDecision, "cancel">,
-): string | undefined {
-  const preferredKind =
-    decision === "acceptForSession"
-      ? "allow_always"
-      : decision === "accept"
-        ? "allow_once"
-        : "reject_once";
-  const preferred = request.options.find((entry) => entry.kind === preferredKind);
-  const preferredId = preferred?.optionId.trim();
-  if (preferredId) {
-    return preferredId;
-  }
-  // Grok 4.6 often omits allow_always. T3 still offers "Always allow this session".
-  if (decision === "acceptForSession") {
-    const once = request.options.find((entry) => entry.kind === "allow_once");
-    const onceId = once?.optionId.trim();
-    if (onceId) {
-      return onceId;
-    }
-  }
-  return undefined;
-}
+// Moved to the shared ACP layer so Cursor resolves ids the same way; the
+// Grok 4.6 allow_always fallback lives there too.
+export const selectGrokPermissionOptionId = selectAcpPermissionOptionId;
 
 function selectAutoApprovedPermissionOption(
   request: EffectAcpSchema.RequestPermissionRequest,
 ): string | undefined {
   return (
-    selectGrokPermissionOptionId(request, "acceptForSession") ??
-    selectGrokPermissionOptionId(request, "accept")
+    selectAcpPermissionOptionId(request, "acceptForSession") ??
+    selectAcpPermissionOptionId(request, "accept")
   );
 }
 
@@ -461,7 +440,8 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
             | "AssistantItemCompleted"
             | "PlanUpdated"
             | "ToolCallUpdated"
-            | "ContentDelta";
+            | "ContentDelta"
+            | "ThoughtDelta";
         }
       >,
     ) {
@@ -1314,7 +1294,8 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                 if (
                   event._tag === "PlanUpdated" ||
                   event._tag === "ToolCallUpdated" ||
-                  event._tag === "ContentDelta"
+                  event._tag === "ContentDelta" ||
+                  event._tag === "ThoughtDelta"
                 ) {
                   yield* logNative(ctx.threadId, "session/update", event.rawPayload);
                 }
@@ -1335,7 +1316,8 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                   event._tag === "AssistantItemCompleted" ||
                   event._tag === "PlanUpdated" ||
                   event._tag === "ToolCallUpdated" ||
-                  event._tag === "ContentDelta"
+                  event._tag === "ContentDelta" ||
+                  event._tag === "ThoughtDelta"
                 ) {
                   yield* recordTurnActivity(ctx, notificationTurnId, event);
                 }
@@ -1351,6 +1333,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                         turnId: notificationTurnId,
                         itemId: event.itemId,
                         lifecycle: "item.started",
+                        ...(event.itemType !== undefined ? { itemType: event.itemType } : {}),
                       }),
                     );
                     return;
@@ -1363,6 +1346,7 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                         turnId: notificationTurnId,
                         itemId: event.itemId,
                         lifecycle: "item.completed",
+                        ...(event.itemType !== undefined ? { itemType: event.itemType } : {}),
                       }),
                     );
                     return;
@@ -1420,6 +1404,37 @@ export function makeGrokAdapter(grokSettings: GrokSettings, options?: GrokAdapte
                         turnId: notificationTurnId,
                         ...(event.itemId ? { itemId: event.itemId } : {}),
                         text: event.text,
+                        rawPayload: event.rawPayload,
+                      }),
+                    );
+                    return;
+                  case "ThoughtDelta":
+                    yield* offerRuntimeEvent(
+                      makeAcpContentDeltaEvent({
+                        stamp,
+                        provider: PROVIDER,
+                        threadId: ctx.threadId,
+                        turnId: notificationTurnId,
+                        ...(event.itemId ? { itemId: event.itemId } : {}),
+                        text: event.text,
+                        streamKind: "reasoning_text",
+                        rawPayload: event.rawPayload,
+                      }),
+                    );
+                    return;
+                  case "AvailableCommandsUpdated":
+                    return;
+                  case "UsageUpdated":
+                    yield* offerRuntimeEvent(
+                      makeAcpTokenUsageEvent({
+                        stamp,
+                        provider: PROVIDER,
+                        threadId: ctx.threadId,
+                        turnId: notificationTurnId,
+                        usage: {
+                          usedTokens: event.usedTokens,
+                          ...(event.maxTokens !== undefined ? { maxTokens: event.maxTokens } : {}),
+                        },
                         rawPayload: event.rawPayload,
                       }),
                     );

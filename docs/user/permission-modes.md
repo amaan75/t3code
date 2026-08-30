@@ -22,6 +22,11 @@ Providers enforce permissions differently. Some read-only actions can proceed in
 **Auto** uses automatic review on Codex, Claude, and Cursor; providers without an equivalent,
 including OpenCode and Antigravity, fall back to asking.
 
+For Cursor, **Supervised** runs the agent in Cursor's read-only Ask mode: it reads and answers,
+and proposes changes instead of making them. In the other modes Cursor applies workspace file
+edits without prompting; **Auto** uses Smart Auto review, and **Accept edits** still stops for
+commands Cursor considers risky.
+
 For Grok, **Always allow this session** remembers the matching command or tool input. Other
 actions still require approval.
 
