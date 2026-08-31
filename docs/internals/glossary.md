@@ -45,3 +45,10 @@ Terms whose meaning matters across T3 Code. Architecture and lifecycle constrain
 | Checkpoint          | A saved workspace state used for diffs and restore, stored as a hidden Git ref.                              |
 | Checkpoint baseline | The workspace state captured before the work being compared.                                                 |
 | Turn diff           | The workspace changes attributed to one turn.                                                                |
+
+## Remote access
+
+| Term           | Meaning                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------- |
+| P2P endpoint   | An environment's presence on the Hyperswarm DHT, dialed by its z-base-32 public key over an encrypted tunnel. |
+| DHT public key | The `t3+p2p://<z32-key>` address a paired device dials to reach a P2P endpoint.                               |

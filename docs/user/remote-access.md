@@ -116,6 +116,27 @@ For a plain HTTP LAN endpoint, use the direct pairing URL in a browser that can
 open it, or pair from the desktop app. On mobile, an IP address entered without a
 scheme uses HTTP, so include `https://` when your server uses HTTPS.
 
+### Peer-to-peer access
+
+Peer-to-peer access lets a paired device dial your environment directly from any network — no VPN,
+no account, and no traffic through anyone's servers. The environment announces itself on a public
+peer-to-peer network (a DHT) under a stable key; a paired client dials that key and gets an
+end-to-end encrypted connection, hole-punched through most home and office NATs.
+
+Turn it on in **Settings → Connections** with the **Peer-to-peer access** toggle, or start a
+headless server with:
+
+```bash
+npx t3 serve --p2p
+```
+
+While it is on, pairing links gain a **Peer-to-peer** share option (a `t3+p2p://…` URL), and
+`npx t3 pair` prints a P2P pairing URL and QR code alongside the regular one. Pair once with either;
+the saved environment then reconnects over the DHT wherever both devices are.
+
+Dialing peer-to-peer environments works from the desktop and mobile apps. Browsers cannot dial
+directly — use one of the apps or another access method there.
+
 ## Desktop-managed SSH
 
 In the desktop app, open **Settings → Connections → Add environment**, choose

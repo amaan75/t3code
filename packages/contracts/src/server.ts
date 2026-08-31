@@ -585,11 +585,30 @@ export const ServerConfig = Schema.Struct({
    */
   environmentThemes: Schema.optional(Schema.Array(EnvironmentTheme)),
   /**
+  /**
    * Quota reported by configured `usageLimitSources`. Like themes, never in
    * a snapshot: the source stream emits the current set on subscribe, and it
    * stays absent for subscribers that did not opt in.
    */
   usageLimitSources: Schema.optional(UsageLimitSourceSnapshots),
+  /**
+   * Remote access state for this environment. Absent on servers that predate
+   * the feature; `p2p` is present whenever the server can report peer-to-peer
+   * announcement state, with `publicKeyZ32` carrying the dialable address only
+   * while announced.
+   */
+  remoteAccess: Schema.optionalKey(
+    Schema.Struct({
+      p2p: Schema.optionalKey(
+        Schema.Struct({
+          enabled: Schema.Boolean,
+          publicKeyZ32: Schema.optionalKey(TrimmedNonEmptyString),
+          /** Set when announcing failed; clients should surface this instead of "waiting". */
+          error: Schema.optionalKey(TrimmedNonEmptyString),
+        }),
+      ),
+    }),
+  ),
 });
 export type ServerConfig = typeof ServerConfig.Type;
 
@@ -652,6 +671,24 @@ export type ServerConfigProviderStatusesPayload = typeof ServerConfigProviderSta
 
 export const ServerConfigSettingsUpdatedPayload = Schema.Struct({
   settings: ServerSettings,
+  /**
+   * Peer-to-peer announcement state for this environment. Optional so older
+   * servers keep working; when present, clients replace `config.remoteAccess`
+   * instead of waiting for a reconnect snapshot (settings alone do not carry
+   * the dialable key).
+   */
+  remoteAccess: Schema.optionalKey(
+    Schema.Struct({
+      p2p: Schema.optionalKey(
+        Schema.Struct({
+          enabled: Schema.Boolean,
+          publicKeyZ32: Schema.optionalKey(TrimmedNonEmptyString),
+          /** Set when announcing failed; clients should surface this instead of "waiting". */
+          error: Schema.optionalKey(TrimmedNonEmptyString),
+        }),
+      ),
+    }),
+  ),
 });
 export type ServerConfigSettingsUpdatedPayload = typeof ServerConfigSettingsUpdatedPayload.Type;
 

@@ -1,4 +1,8 @@
-import { EnvironmentHttpApi, ProviderDriverKind } from "@t3tools/contracts";
+import {
+  EnvironmentHttpApi,
+  ProviderDriverKind,
+  type ServerSettings as ServerSettingsValue,
+} from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Deferred from "effect/Deferred";
@@ -110,6 +114,7 @@ import {
 import { serverRelayBrokerTracingLayer } from "./cloud/relayTracing.ts";
 import { shouldRetryCloudLink } from "./cloud/relayResponse.ts";
 import * as CloudManagedEndpointRuntime from "./cloud/ManagedEndpointRuntime.ts";
+import * as P2pEndpointRuntime from "./remoteAccess/P2pEndpointRuntime.ts";
 import * as CloudCliTokenManager from "./cloud/CliTokenManager.ts";
 import * as CloudCliState from "./cloud/CliState.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
@@ -418,6 +423,10 @@ const CloudManagedEndpointRuntimeLive = Layer.mergeAll(
   ),
 );
 
+const P2pEndpointRuntimeLive = P2pEndpointRuntime.layer.pipe(
+  Layer.provide(ServerSecretStore.layer),
+);
+
 const ProviderRuntimeLayerLive = ProviderSessionReaperLive.pipe(
   // Subscribes to `account.rate-limits.updated` so usage bars track live
   // telemetry instead of waiting for the next status probe.
@@ -511,6 +520,7 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
         Layer.provide(ExternalLauncher.layer),
       ),
       CloudManagedEndpointRuntimeLive,
+      P2pEndpointRuntimeLive,
     ),
   ),
 );
@@ -572,6 +582,7 @@ export const makeServerLayer = Layer.unwrap(
     const activationLayer = Layer.succeed(ServerActivation, awaitActivation);
     const runtimeStateParked = yield* Deferred.make<void>();
     const tailscaleParked = yield* Deferred.make<void>();
+    const p2pParked = yield* Deferred.make<void>();
     const cloudLinkParked = yield* Deferred.make<void>();
     const routesReady = yield* Deferred.make<void>();
     const launcherLayer = ServiceLauncherClient.layer;
@@ -670,6 +681,45 @@ export const makeServerLayer = Layer.unwrap(
           ),
         )
       : Layer.empty;
+    // Announces on the DHT when either the --p2p flag/env or the persisted
+    // setting asks for it, and follows setting changes at runtime. The flag
+    // forces announcing on; the flag's bootstrap list outranks the setting's.
+    const p2pEndpointLayer = Layer.effectDiscard(
+      Effect.gen(function* () {
+        yield* Deferred.succeed(p2pParked, undefined).pipe(Effect.orDie);
+        yield* awaitActivation;
+        const server = yield* HttpServer.HttpServer;
+        const address = server.address;
+        if (typeof address === "string" || !("port" in address)) {
+          return;
+        }
+        const targetPort = address.port;
+        const runtime = yield* P2pEndpointRuntime.P2pEndpointRuntime;
+        const settingsService = yield* ServerSettings.ServerSettingsService;
+        yield* Effect.addFinalizer(() => runtime.disable);
+
+        const reconcile = (settings: ServerSettingsValue) => {
+          const enabled = config.p2pEnabled || settings.remoteAccess.p2pEnabled;
+          if (!enabled) {
+            return runtime.disable;
+          }
+          const bootstrap =
+            config.p2pBootstrap.length > 0
+              ? config.p2pBootstrap
+              : settings.remoteAccess.p2pBootstrap;
+          return runtime.ensure({ targetPort, bootstrap }).pipe(Effect.asVoid);
+        };
+
+        const changes = yield* settingsService.subscribeChanges;
+        yield* settingsService.getSettings.pipe(
+          Effect.flatMap(reconcile),
+          Effect.catch((cause) =>
+            Effect.logWarning("Failed to reconcile the P2P endpoint from settings", { cause }),
+          ),
+        );
+        yield* changes.pipe(Stream.runForEach(reconcile), Effect.forkScoped);
+      }),
+    );
     const cloudDesiredLinkReconcileLayer = Layer.effectDiscard(
       Effect.gen(function* () {
         if (!hasCloudPublicConfig) {
@@ -746,6 +796,7 @@ export const makeServerLayer = Layer.unwrap(
           Deferred.await(cloudLinkParked),
           Deferred.await(routesReady),
           ...(config.tailscaleServeEnabled ? [Deferred.await(tailscaleParked)] : []),
+          Deferred.await(p2pParked),
         ],
         { concurrency: "unbounded" },
       ).pipe(Effect.asVoid),
@@ -760,6 +811,7 @@ export const makeServerLayer = Layer.unwrap(
       httpListeningLayer,
       runtimeStateLayer,
       tailscaleServeLayer,
+      p2pEndpointLayer,
       cloudDesiredLinkReconcileLayer,
     );
 

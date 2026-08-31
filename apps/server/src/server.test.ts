@@ -160,6 +160,7 @@ import * as GitWorkflowService from "./git/GitWorkflowService.ts";
 import * as ReviewService from "./review/ReviewService.ts";
 import * as SourceControlRepositoryService from "./sourceControl/SourceControlRepositoryService.ts";
 import * as ServerSecretStore from "./auth/ServerSecretStore.ts";
+import * as P2pEndpointRuntime from "./remoteAccess/P2pEndpointRuntime.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as PairingGrantStore from "./auth/PairingGrantStore.ts";
 import * as CloudManagedEndpointRuntime from "./cloud/ManagedEndpointRuntime.ts";
@@ -538,6 +539,7 @@ const buildAppUnderTest = (options?: {
     cloudManagedEndpointRuntime?: Partial<
       CloudManagedEndpointRuntime.CloudManagedEndpointRuntime["Service"]
     >;
+    p2pEndpointRuntime?: Partial<P2pEndpointRuntime.P2pEndpointRuntime["Service"]>;
     relayClient?: Partial<RelayClient.RelayClient["Service"]>;
     cloudCliTokenManager?: Partial<CloudCliTokenManager.CloudCliTokenManager["Service"]>;
     nativeTelemetryClient?: Partial<NativeTelemetryClient.NativeTelemetryClient["Service"]>;
@@ -579,6 +581,8 @@ const buildAppUnderTest = (options?: {
       logWebSocketEvents: false,
       tailscaleServeEnabled: false,
       tailscaleServePort: 443,
+      p2pEnabled: false,
+      p2pBootstrap: [],
       ...options?.config,
     };
     const layerConfig = ServerConfig.layer(config);
@@ -1122,6 +1126,18 @@ const buildAppUnderTest = (options?: {
           CloudManagedEndpointRuntime.CloudManagedEndpointRuntime.of({
             applyConfig: () => Effect.succeed({ status: "disabled" }),
             ...options?.layers?.cloudManagedEndpointRuntime,
+          }),
+        ),
+      ),
+      Layer.provide(
+        Layer.succeed(
+          P2pEndpointRuntime.P2pEndpointRuntime,
+          P2pEndpointRuntime.P2pEndpointRuntime.of({
+            status: Effect.succeed({ status: "disabled" }),
+            ensure: () => Effect.succeed({ status: "disabled" }),
+            disable: Effect.void,
+            streamChanges: Stream.empty,
+            ...options?.layers?.p2pEndpointRuntime,
           }),
         ),
       ),
