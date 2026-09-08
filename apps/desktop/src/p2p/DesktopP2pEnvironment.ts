@@ -8,7 +8,7 @@ import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Scope from "effect/Scope";
 
-export class DesktopP2pEnvironmentError extends Schema.TaggedErrorClass<DesktopP2pEnvironmentError>()(
+export class DesktopP2pEnvironmentError extends Schema.TaggedError<DesktopP2pEnvironmentError>()(
   "DesktopP2pEnvironmentError",
   {
     detail: Schema.String,

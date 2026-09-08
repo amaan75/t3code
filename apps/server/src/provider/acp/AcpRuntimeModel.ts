@@ -135,14 +135,6 @@ export type AcpParsedSessionEvent =
       readonly usedTokens: number;
       readonly maxTokens?: number;
       readonly rawPayload: unknown;
-    }
-  | {
-      readonly _tag: "AvailableCommandsUpdated";
-      readonly commands: ReadonlyArray<{
-        readonly name: string;
-        readonly description: string;
-      }>;
-      readonly rawPayload: unknown;
     };
 
 type AcpSessionSetupResponse =
@@ -897,18 +889,6 @@ export function parseSessionUpdateEvent(params: EffectAcpSchema.SessionNotificat
           rawPayload: params,
         });
       }
-      break;
-    }
-    case "available_commands_update": {
-      // An empty list is meaningful: the agent is clearing its commands.
-      events.push({
-        _tag: "AvailableCommandsUpdated",
-        commands: upd.availableCommands.flatMap((command) => {
-          const name = command.name.trim();
-          return name.length > 0 ? [{ name, description: command.description.trim() }] : [];
-        }),
-        rawPayload: params,
-      });
       break;
     }
     case "usage_update": {

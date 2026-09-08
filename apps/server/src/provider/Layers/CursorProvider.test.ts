@@ -434,7 +434,7 @@ describe("Cursor skills", () => {
           {
             name: "review",
             description: "shared",
-            path: path.join(root, "review", "SKILL.md"),
+            path: path.join(yield* fileSystem.realPath(root), "review", "SKILL.md"),
             scope: "project",
             enabled: true,
           },
@@ -648,7 +648,7 @@ describe("discoverCursorModelsViaAcp", () => {
           auth: { status: "authenticated" as const, label: "first@example.test" },
         };
         const first = yield* discover(about);
-        expect(first.length).toBeGreaterThan(0);
+        expect(first.models.length).toBeGreaterThan(0);
         yield* fileSystem.writeFileString(requestLogPath, "");
         expect(yield* discover(about)).toEqual(first);
         expect(yield* fileSystem.readFileString(requestLogPath)).toBe("");

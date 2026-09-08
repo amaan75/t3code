@@ -62,10 +62,7 @@ export type AcpSessionRuntimeEvent =
       readonly error: EffectAcpErrors.AcpError;
     };
 
-export type AcpAvailableCommands = ReadonlyArray<{
-  readonly name: string;
-  readonly description: string;
-}>;
+export type AcpAvailableCommands = ReadonlyArray<EffectAcpSchema.AvailableCommand>;
 
 const defaultSessionLoadTimeout = Duration.seconds(90);
 const defaultSessionLoadReplayIdleGap = Duration.seconds(2);
@@ -567,6 +564,9 @@ export const make = (
         }),
       ),
     );
+    yield* Scope.addFinalizer(
+      runtimeScope,
+      Ref.set(stoppingRef, true).pipe(Effect.andThen(Deferred.succeed(runtimeClosed, undefined))),
     );
     const initializeClientCapabilities = {
       fs: {
@@ -1170,7 +1170,7 @@ const handleSessionUpdate = ({
     }
     for (const event of parsed.events) {
       if (event._tag === "AvailableCommandsUpdated") {
-        yield* Ref.set(availableCommandsRef, event.commands);
+        yield* Ref.set(availableCommandsRef, event.availableCommands);
       }
       if (event._tag === "ToolCallUpdated") {
         yield* closeActiveAssistantSegment({
