@@ -666,7 +666,7 @@ const PairingLinkListRow = memo(function PairingLinkListRow({
         label: "Peer-to-peer",
         url: buildP2pPairingUrl({
           publicKeyZ32: p2pShareTarget.publicKeyZ32,
-          credential: pairingLink.credential,
+          credential,
           bootstrap: p2pShareTarget.bootstrap,
         }),
         detail: "Dials this environment by key over the DHT, from any network",

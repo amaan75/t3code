@@ -690,7 +690,7 @@ export const makeCursorModelDiscovery = Effect.fn("makeCursorModelDiscovery")(fu
     {
       capacity: 1,
       timeToLive: (exit) =>
-        Exit.isSuccess(exit) && exit.value.length > 0 ? Duration.minutes(30) : Duration.zero,
+        Exit.isSuccess(exit) && exit.value.models.length > 0 ? Duration.minutes(30) : Duration.zero,
     },
   );
   return (about: Pick<CursorAboutResult, "version" | "auth">) =>
