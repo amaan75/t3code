@@ -80,6 +80,8 @@ export interface AcpPermissionRequest {
   readonly toolCall?: AcpToolCallState;
 }
 
+export type AcpAssistantSegmentItemType = "assistant_message" | "reasoning";
+
 export type AcpParsedSessionEvent =
   | {
       readonly _tag: "ModeChanged";
@@ -98,10 +100,12 @@ export type AcpParsedSessionEvent =
   | {
       readonly _tag: "AssistantItemStarted";
       readonly itemId: string;
+      readonly itemType?: AcpAssistantSegmentItemType;
     }
   | {
       readonly _tag: "AssistantItemCompleted";
       readonly itemId: string;
+      readonly itemType?: AcpAssistantSegmentItemType;
     }
   | {
       readonly _tag: "PlanUpdated";
@@ -121,7 +125,15 @@ export type AcpParsedSessionEvent =
     }
   | {
       readonly _tag: "ThoughtDelta";
+      readonly itemId?: string;
       readonly text: string;
+      readonly rawPayload: unknown;
+    }
+  | {
+      readonly _tag: "UsageUpdated";
+      /** Tokens currently occupying the session's context window. */
+      readonly usedTokens: number;
+      readonly maxTokens?: number;
       readonly rawPayload: unknown;
     };
 
@@ -874,6 +886,19 @@ export function parseSessionUpdateEvent(params: EffectAcpSchema.SessionNotificat
         events.push({
           _tag: "ThoughtDelta",
           text: upd.content.text,
+          rawPayload: params,
+        });
+      }
+      break;
+    }
+    case "usage_update": {
+      const usedTokens = Math.max(0, Math.round(upd.used));
+      const maxTokens = Math.round(upd.size);
+      if (usedTokens > 0) {
+        events.push({
+          _tag: "UsageUpdated",
+          usedTokens,
+          ...(maxTokens > 0 ? { maxTokens } : {}),
           rawPayload: params,
         });
       }

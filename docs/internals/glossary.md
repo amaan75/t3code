@@ -64,3 +64,10 @@ Terms whose meaning matters across T3 Code. Architecture and lifecycle constrain
 | Attachment inventory | The ordered image records shown as thumbnails above the prose, including images with no inline references.                          |
 
 See [composer context references](./composer-context-references.md) for the contract and lifecycle.
+
+## Remote access
+
+| Term           | Meaning                                                                                                       |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
+| P2P endpoint   | An environment's presence on the Hyperswarm DHT, dialed by its z-base-32 public key over an encrypted tunnel. |
+| DHT public key | The `t3+p2p://<z32-key>` address a paired device dials to reach a P2P endpoint.                               |

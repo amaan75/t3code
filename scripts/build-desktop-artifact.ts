@@ -54,7 +54,7 @@ import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const DESKTOP_APP_ID = "com.t3tools.t3code";
+const DESKTOP_APP_ID = "com.t3tools.t3pear";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
@@ -2613,9 +2613,7 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
-  return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "T3 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "T3 Code");
+  return resolveDesktopUpdateChannel(version) === "nightly" ? "T3 Pear (Nightly)" : "T3 Pear";
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2637,11 +2635,21 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   wslRuntimeBundled = false,
   arch?: typeof BuildArch.Type,
 ) {
+  const path = yield* Path.Path;
+  const repoRoot = yield* RepoRoot;
+  const fs = yield* FileSystem.FileSystem;
+  // Prefer the workspace Electron unpack over electron-builder's GitHub
+  // download. Local installs already have this binary, and re-fetching it is a
+  // common TLS flake on flaky networks.
+  const workspaceElectronDist = path.join(repoRoot, "apps/desktop/node_modules/electron/dist");
+  const hasWorkspaceElectronDist = yield* fs.exists(workspaceElectronDist);
+
   const buildConfig: Record<string, unknown> = {
     appId: DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    artifactName: "T3-Pear-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
+    ...(hasWorkspaceElectronDist ? { electronDist: workspaceElectronDist } : {}),
     files: [
       ...DESKTOP_FILE_EXCLUSIONS,
       ...(platform === "mac"
@@ -2683,8 +2691,6 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   }
 
   if (platform === "mac") {
-    const path = yield* Path.Path;
-    const repoRoot = yield* RepoRoot;
     buildConfig.mac = {
       target: target === "dmg" ? [target, "zip"] : [target],
       icon: "icon.icns",
@@ -2696,7 +2702,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       protocols: [
         {
           name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          schemes: ["t3pear"],
         },
       ],
       ...(signed ? { sign: path.join(repoRoot, "scripts/sign-macos.ts") } : {}),
@@ -2743,7 +2749,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       protocols: [
         {
           name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          schemes: ["t3pear"],
         },
       ],
       desktop: {
