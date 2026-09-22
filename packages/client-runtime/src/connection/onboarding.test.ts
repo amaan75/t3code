@@ -158,6 +158,7 @@ describe("connection onboarding", () => {
         Effect.provide(
           Layer.mergeAll(
             CLIENT_PRESENTATION_LAYER,
+            P2P_GATEWAY_STUB_LAYER,
             pairingHttpLayer(calls, { protocolVersion: ORCHESTRATION_PROTOCOL_VERSION + 1 }),
           ),
         ),

@@ -1165,38 +1165,36 @@ const buildAppUnderTest = (options?: {
         }),
       ),
       Layer.provide(
-        Layer.succeed(
-          CloudManagedEndpointRuntime.CloudManagedEndpointRuntime,
-          CloudManagedEndpointRuntime.CloudManagedEndpointRuntime.of({
-            applyConfig: () => Effect.succeed({ status: "disabled" }),
-            ...options?.layers?.cloudManagedEndpointRuntime,
-          }),
-        ),
-      ),
-      Layer.provide(
-        Layer.succeed(
-          P2pEndpointRuntime.P2pEndpointRuntime,
-          P2pEndpointRuntime.P2pEndpointRuntime.of({
-            status: Effect.succeed({ status: "disabled" }),
-            ensure: () => Effect.succeed({ status: "disabled" }),
-            disable: Effect.void,
-            streamChanges: Stream.empty,
-            ...options?.layers?.p2pEndpointRuntime,
-          }),
-        ),
-      ),
-      Layer.provide(
-        Layer.succeed(
-          RelayClient.RelayClient,
-          RelayClient.RelayClient.of({
-            resolve: Effect.succeed({
-              status: "missing",
-              version: RelayClient.CLOUDFLARED_VERSION,
+        Layer.mergeAll(
+          Layer.succeed(
+            CloudManagedEndpointRuntime.CloudManagedEndpointRuntime,
+            CloudManagedEndpointRuntime.CloudManagedEndpointRuntime.of({
+              applyConfig: () => Effect.succeed({ status: "disabled" }),
+              ...options?.layers?.cloudManagedEndpointRuntime,
             }),
-            install: Effect.die("unused relay-client install"),
-            installWithProgress: () => Effect.die("unused relay-client install"),
-            ...options?.layers?.relayClient,
-          }),
+          ),
+          Layer.succeed(
+            P2pEndpointRuntime.P2pEndpointRuntime,
+            P2pEndpointRuntime.P2pEndpointRuntime.of({
+              status: Effect.succeed({ status: "disabled" }),
+              ensure: () => Effect.succeed({ status: "disabled" }),
+              disable: Effect.void,
+              streamChanges: Stream.empty,
+              ...options?.layers?.p2pEndpointRuntime,
+            }),
+          ),
+          Layer.succeed(
+            RelayClient.RelayClient,
+            RelayClient.RelayClient.of({
+              resolve: Effect.succeed({
+                status: "missing",
+                version: RelayClient.CLOUDFLARED_VERSION,
+              }),
+              install: Effect.die("unused relay-client install"),
+              installWithProgress: () => Effect.die("unused relay-client install"),
+              ...options?.layers?.relayClient,
+            }),
+          ),
         ),
       ),
       Layer.provide(

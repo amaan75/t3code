@@ -80,13 +80,13 @@ const tailscaleServePortFlag = Flag.Int("tailscale-serve-port").pipe(
   Flag.withDescription("HTTPS port for Tailscale Serve when --tailscale-serve is enabled."),
   Flag.optional,
 );
-export const p2pFlag = Flag.boolean("p2p").pipe(
+export const p2pFlag = Flag.Boolean("p2p").pipe(
   Flag.withDescription(
     "Announce this backend on the peer-to-peer DHT so paired devices can dial it directly.",
   ),
   Flag.optional,
 );
-export const p2pBootstrapFlag = Flag.string("p2p-bootstrap").pipe(
+export const p2pBootstrapFlag = Flag.String("p2p-bootstrap").pipe(
   Flag.withDescription(
     "Comma-separated host:port DHT bootstrap nodes; defaults to the public DHT.",
   ),
@@ -174,8 +174,8 @@ const EnvServerConfig = Config.all({
     Config.option,
     Config.map(Option.getOrUndefined),
   ),
-  p2pEnabled: Config.boolean("T3CODE_P2P").pipe(Config.option, Config.map(Option.getOrUndefined)),
-  p2pBootstrap: Config.string("T3CODE_P2P_BOOTSTRAP").pipe(
+  p2pEnabled: Config.Boolean("T3CODE_P2P").pipe(Config.option, Config.map(Option.getOrUndefined)),
+  p2pBootstrap: Config.String("T3CODE_P2P_BOOTSTRAP").pipe(
     Config.option,
     Config.map(Option.getOrUndefined),
   ),

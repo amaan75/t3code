@@ -65,6 +65,8 @@ const configLayer = (overrides: Partial<ServerConfig.ServerConfig["Service"]>) =
         logWebSocketEvents: false,
         tailscaleServeEnabled: false,
         tailscaleServePort: 443,
+        p2pEnabled: false,
+        p2pBootstrap: [],
         port: 0,
         host: undefined,
         desktopBootstrapToken: undefined,
