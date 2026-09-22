@@ -29,6 +29,7 @@ import {
   resolveSshHost,
   resolveSshPasswordPrompt,
 } from "./methods/sshEnvironment.ts";
+import { disconnectP2pEnvironment, ensureP2pEnvironment } from "./methods/p2pEnvironment.ts";
 import {
   checkForUpdate,
   downloadUpdate,
@@ -114,6 +115,9 @@ export const installDesktopIpcHandlers = Effect.fn("desktop.ipc.installHandlers"
   yield* ipc.handle(fetchSshSessionState);
   yield* ipc.handle(issueSshWebSocketTicket);
   yield* ipc.handle(resolveSshPasswordPrompt);
+
+  yield* ipc.handle(ensureP2pEnvironment);
+  yield* ipc.handle(disconnectP2pEnvironment);
 
   yield* ipc.handle(getServerExposureState);
   yield* ipc.handle(setServerExposureMode);

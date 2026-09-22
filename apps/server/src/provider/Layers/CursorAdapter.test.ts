@@ -1483,7 +1483,7 @@ cursorAdapterTestLayer("CursorAdapterLive", (it) => {
       const failure = yield* adapter
         .sendTurn({ threadId, input: "hello", attachments: [] })
         .pipe(Effect.flip);
-      assert.equal(failure._tag, "ProviderAdapterSessionClosedError");
+      assert.equal(failure._tag, "ProviderAdapterProcessError");
 
       const exited = runtimeEvents.find((event) => event.type === "session.exited");
       assert.isDefined(exited);

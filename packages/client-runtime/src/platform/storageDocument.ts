@@ -66,6 +66,7 @@ function connectionIdOf(target: ConnectionTarget): string | null {
       return null;
     case "BearerConnectionTarget":
     case "SshConnectionTarget":
+    case "P2pConnectionTarget":
       return target.connectionId;
   }
 }
@@ -147,6 +148,19 @@ export function registerConnectionInCatalog(
           (value) => value.connectionId,
           registration.profile,
         ),
+      };
+    case "P2pConnectionRegistration":
+      return {
+        ...next,
+        profiles: replaceCatalogValue(
+          next.profiles,
+          (value) => value.connectionId,
+          registration.profile,
+        ),
+        credentials: replaceCatalogValue(next.credentials, (value) => value.connectionId, {
+          connectionId: registration.target.connectionId,
+          credential: registration.credential,
+        }),
       };
   }
 }
