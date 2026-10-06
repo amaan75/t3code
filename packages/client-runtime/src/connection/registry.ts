@@ -19,6 +19,7 @@ import {
   type ConnectionProfile,
   type ConnectionRegistration,
   type ConnectionRoute,
+  P2pConnectionProfile,
   type PlatformConnectionRegistration,
   type PrimaryConnectionRegistration,
   SshConnectionProfile,
@@ -56,6 +57,7 @@ import {
 } from "./routes.ts";
 
 const isSshConnectionProfile = Schema.is(SshConnectionProfile);
+const isP2pConnectionProfile = Schema.is(P2pConnectionProfile);
 
 function unsupportedState(
   entry: ConnectionCatalogEntry,
@@ -217,13 +219,16 @@ export const make = Effect.gen(function* () {
   const driver = yield* ConnectionDriver.ConnectionDriver;
   const wakeups = yield* ConnectionWakeups.ConnectionWakeups;
   const ssh = yield* ClientCapabilities.SshEnvironmentGateway;
+  const p2p = yield* ClientCapabilities.P2pEnvironmentGateway;
   const persistedTargets = yield* storage.list;
   const disabledEnvironmentIds = new Set(yield* storage.listDisabled);
   const loadRoute = Effect.fn("EnvironmentRegistry.loadRoute")(function* (
     target: ConnectionTarget,
   ) {
     const profile: Option.Option<ConnectionProfile> =
-      target._tag === "BearerConnectionTarget" || target._tag === "SshConnectionTarget"
+      target._tag === "BearerConnectionTarget" ||
+      target._tag === "SshConnectionTarget" ||
+      target._tag === "P2pConnectionTarget"
         ? yield* profiles.get(target.connectionId)
         : Option.none();
     return { target, profile } satisfies ConnectionRoute;
@@ -854,8 +859,8 @@ export const make = Effect.gen(function* () {
 
     for (const route of connectionRoutes(entry)) {
       const profile = Option.getOrNull(route.profile);
-      if (profile !== null && isSshConnectionProfile(profile)) {
-        yield* disconnectSsh(environmentId, profile);
+      if (profile !== null) {
+        yield* disconnectRouteTransport(environmentId, profile);
       }
     }
   });
@@ -874,6 +879,25 @@ export const make = Effect.gen(function* () {
       ),
       Effect.ignore,
     );
+
+  const disconnectP2p = (environmentId: EnvironmentId, profile: P2pConnectionProfile) =>
+    p2p.disconnect(profile.publicKeyZ32).pipe(
+      Effect.tapError((error) =>
+        Effect.logWarning("Could not disconnect the P2P environment tunnel.", {
+          environmentId,
+          error,
+        }),
+      ),
+      Effect.ignore,
+    );
+
+  // SSH and P2P routes own a local tunnel that outlives the RPC session.
+  const disconnectRouteTransport = (environmentId: EnvironmentId, profile: ConnectionProfile) =>
+    isSshConnectionProfile(profile)
+      ? disconnectSsh(environmentId, profile)
+      : isP2pConnectionProfile(profile)
+        ? disconnectP2p(environmentId, profile)
+        : Effect.void;
 
   // Plain HTTP routes are unusable from an HTTPS page, which blocks mixed content.
   const allowInsecureRoutes =
@@ -957,8 +981,8 @@ export const make = Effect.gen(function* () {
         if (remaining.length === 0) return yield* removeLocked(environmentId);
         yield* replaceRoutesLocked(entry, remaining);
         const profile = Option.getOrNull(route.profile);
-        if (profile !== null && isSshConnectionProfile(profile)) {
-          yield* disconnectSsh(environmentId, profile);
+        if (profile !== null) {
+          yield* disconnectRouteTransport(environmentId, profile);
         }
       }),
     );
@@ -1063,8 +1087,8 @@ export const make = Effect.gen(function* () {
         if (!enabled) {
           for (const route of connectionRoutes(entry)) {
             const profile = Option.getOrNull(route.profile);
-            if (profile !== null && isSshConnectionProfile(profile)) {
-              yield* disconnectSsh(environmentId, profile);
+            if (profile !== null) {
+              yield* disconnectRouteTransport(environmentId, profile);
             }
           }
         }

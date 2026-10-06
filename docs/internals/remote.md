@@ -2,8 +2,8 @@
 
 Each connection joins a client to one environment over HTTP and WebSocket. The
 environment owns providers, execution, files, and durable state. Direct access,
-Tailscale, SSH, and T3 Connect change how the client reaches that server; they do
-not introduce another execution model. See
+Tailscale, SSH, peer-to-peer, and T3 Connect change how the client reaches that
+server; they do not introduce another execution model. See
 [remote access](../user/remote-access.md) for setup.
 
 ## Identity is independent of the route
@@ -82,6 +82,11 @@ renderer uses the forwarded endpoint through the shared connection runtime.
 launcher owns it; a server it discovered already running must survive a client
 disconnect. Reconnection restores the forward before opening the application
 transport.
+
+Peer-to-peer connections dial an environment by DHT public key over Hyperswarm.
+Desktop and mobile platforms run a local dialer gateway that maps the encrypted
+Noise stream to loopback URLs, allowing ordinary bearer authorization over the
+tunnel.
 
 Remote servers can outlive several client releases. Clients must use advertised
 capabilities and handle their absence, rather than assume their own version

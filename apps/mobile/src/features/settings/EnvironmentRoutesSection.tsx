@@ -36,6 +36,7 @@ const ROUTE_ICONS: Record<ConnectionRouteKind, AppSymbolName> = {
   lan: "wifi",
   tailnet: "point.3.connected.trianglepath.dotted",
   public: "globe",
+  p2p: "person.2",
   ssh: "terminal",
 };
 

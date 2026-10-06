@@ -20,7 +20,14 @@ import { BearerConnectionTarget, type ConnectionTarget } from "./model.ts";
  * to a better one when it becomes reachable again.
  */
 
-export type ConnectionRouteKind = "relay" | "loopback" | "lan" | "tailnet" | "public" | "ssh";
+export type ConnectionRouteKind =
+  | "relay"
+  | "loopback"
+  | "lan"
+  | "tailnet"
+  | "public"
+  | "p2p"
+  | "ssh";
 
 /** An environment has at most one T3 Connect route, so it needs no per-route id. */
 export const RELAY_ROUTE_ID = "relay";
@@ -33,6 +40,7 @@ export function connectionRouteId(target: ConnectionTarget): string {
       return RELAY_ROUTE_ID;
     case "BearerConnectionTarget":
     case "SshConnectionTarget":
+    case "P2pConnectionTarget":
       return target.connectionId;
   }
 }
@@ -91,6 +99,8 @@ export function connectionRouteKind(route: ConnectionRoute): ConnectionRouteKind
       return "relay";
     case "SshConnectionTarget":
       return "ssh";
+    case "P2pConnectionTarget":
+      return "p2p";
     case "PrimaryConnectionTarget":
     case "BearerConnectionTarget": {
       const hostname = routeHostname(route);
@@ -107,8 +117,9 @@ const ROUTE_KIND_RANK: Record<ConnectionRouteKind, number> = {
   lan: 1,
   tailnet: 2,
   public: 3,
-  ssh: 4,
-  relay: 5,
+  p2p: 4,
+  ssh: 5,
+  relay: 6,
 };
 
 /**
@@ -161,6 +172,8 @@ function routeAddressKey(route: ConnectionRoute): string | null {
       return `bearer:${profile.httpBaseUrl.replace(/\/+$/, "")}`;
     case "SshConnectionProfile":
       return `ssh:${sshTargetKey(profile.target)}`;
+    case "P2pConnectionProfile":
+      return `p2p:${profile.publicKeyZ32}`;
     default:
       return null;
   }
@@ -177,6 +190,8 @@ export function connectionRouteLabel(route: ConnectionRoute): string {
       return "LAN";
     case "tailnet":
       return "Tailscale";
+    case "p2p":
+      return "Peer-to-peer";
     case "ssh": {
       const profile = Option.getOrNull(route.profile);
       return profile?._tag === "SshConnectionProfile"
@@ -193,6 +208,10 @@ export function connectionRouteAddress(route: ConnectionRoute): string | null {
   if (route.target._tag === "SshConnectionTarget") {
     const profile = Option.getOrNull(route.profile);
     return profile?._tag === "SshConnectionProfile" ? profile.target.alias : null;
+  }
+  if (route.target._tag === "P2pConnectionTarget") {
+    const profile = Option.getOrNull(route.profile);
+    return profile?._tag === "P2pConnectionProfile" ? profile.publicKeyZ32 : null;
   }
   return routeHttpBaseUrl(route);
 }

@@ -52,6 +52,10 @@ describe("shouldBundleCliDependency", () => {
       "@napi-rs/keyring",
       "@clerk/electron-passkeys",
       "node-addon-api",
+      "hyperdht",
+      "udx-native",
+      "sodium-native",
+      "require-addon",
     ]) {
       assert.strictEqual(shouldBundleCliDependency(id), false, id);
     }
@@ -83,7 +87,7 @@ describe("selectCliRuntimeExternalDependencies", () => {
   it("selects every external root declared by the server", () => {
     assert.deepStrictEqual(
       Object.keys(selectCliRuntimeExternalDependencies(serverPackageJson.dependencies)).sort(),
-      ["@cursor/sdk", "@ff-labs/fff-node", "@napi-rs/keyring", "node-pty"],
+      ["@cursor/sdk", "@ff-labs/fff-node", "@napi-rs/keyring", "hyperdht", "node-pty", "z32"],
     );
   });
 });

@@ -40,17 +40,20 @@
     "@opencode/schema": "2.0.23",
     "diff": "8.0.3",
     "effect": "catalog:",
+    "hyperdht": "^6.33.2",
     "jose": "catalog:",
     "node-pty": "^1.2.0-beta.15",
     "proper-lockfile": "4.1.2",
     "stream-chain": "^4.2.5",
     "stream-json": "3.6.0",
     "yaml": "catalog:",
-    "yauzl": "^3.4.0"
+    "yauzl": "^3.4.0",
+    "z32": "^1.1.0"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:",
     "@t3tools/contracts": "workspace:*",
+    "@t3tools/p2p": "workspace:*",
     "@t3tools/shared": "workspace:*",
     "@t3tools/ssh": "workspace:*",
     "@t3tools/tailscale": "workspace:*",

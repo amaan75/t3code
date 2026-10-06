@@ -209,6 +209,7 @@ import * as RepositoryIdentityResolver from "./project/RepositoryIdentityResolve
 import * as WorktreeSetupTracker from "./project/WorktreeSetupTracker.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as DirectEndpoints from "./environment/DirectEndpoints.ts";
+import * as P2pEndpointRuntime from "./remoteAccess/P2pEndpointRuntime.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
 import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
@@ -1280,6 +1281,7 @@ const layerWsRpc = (
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
       const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
+      const p2pEndpointRuntime = yield* P2pEndpointRuntime.P2pEndpointRuntime;
       const backgroundPolicy = yield* BackgroundPolicy.BackgroundPolicy;
       const rpcClientIds = yield* Ref.make(new Set<RpcClientId>());
       yield* Effect.addFinalizer(() =>
@@ -1726,8 +1728,32 @@ const layerWsRpc = (
               onSome: (root) => ({ scratchWorkspaceRoot: root }),
             }),
             newProjectsRoot: managedFolders.namedProjectsRoot,
+            remoteAccess: {
+              p2p: yield* p2pEndpointRuntime.status.pipe(
+                Effect.map((p2pStatus) => ({
+                  enabled: config.p2pEnabled || settings.remoteAccess.p2pEnabled,
+                  ...(p2pStatus.status === "announced"
+                    ? { publicKeyZ32: p2pStatus.publicKeyZ32 }
+                    : {}),
+                  ...(p2pStatus.status === "unavailable" ? { error: p2pStatus.reason } : {}),
+                })),
+              ),
+            },
           };
         });
+
+      const resolveRemoteAccessP2p = (input: {
+        readonly settings: { readonly remoteAccess: { readonly p2pEnabled: boolean } };
+        readonly p2pStatus: P2pEndpointRuntime.P2pEndpointStatus;
+      }) => ({
+        p2p: {
+          enabled: config.p2pEnabled || input.settings.remoteAccess.p2pEnabled,
+          ...(input.p2pStatus.status === "announced"
+            ? { publicKeyZ32: input.p2pStatus.publicKeyZ32 }
+            : {}),
+          ...(input.p2pStatus.status === "unavailable" ? { error: input.p2pStatus.reason } : {}),
+        },
+      });
 
       const refreshGitStatus = (cwd: string) =>
         vcsStatusBroadcaster
@@ -3687,11 +3713,36 @@ const layerWsRpc = (
                   : Stream.empty;
               const settingsUpdates = serverSettings.streamChanges.pipe(
                 Stream.map((settings) => ServerSettings.redactServerSettingsForClient(settings)),
-                Stream.map((settings) => ({
-                  version: 1 as const,
-                  type: "settingsUpdated" as const,
-                  payload: { settings },
-                })),
+                Stream.mapEffect((settings) =>
+                  Effect.gen(function* () {
+                    const p2pStatus = yield* p2pEndpointRuntime.status;
+                    return {
+                      version: 1 as const,
+                      type: "settingsUpdated" as const,
+                      payload: {
+                        settings,
+                        remoteAccess: resolveRemoteAccessP2p({ settings, p2pStatus }),
+                      },
+                    };
+                  }),
+                ),
+              );
+              const p2pUpdates = p2pEndpointRuntime.streamChanges.pipe(
+                Stream.mapEffect((p2pStatus) =>
+                  Effect.gen(function* () {
+                    const settings = ServerSettings.redactServerSettingsForClient(
+                      yield* serverSettings.getSettings,
+                    );
+                    return {
+                      version: 1 as const,
+                      type: "settingsUpdated" as const,
+                      payload: {
+                        settings,
+                        remoteAccess: resolveRemoteAccessP2p({ settings, p2pStatus }),
+                      },
+                    };
+                  }),
+                ),
               );
 
               const liveUpdates = Stream.merge(
@@ -3700,7 +3751,10 @@ const layerWsRpc = (
                   providerStatuses,
                   Stream.merge(
                     settingsUpdates,
-                    Stream.merge(environmentThemeUpdates, usageLimitSourceUpdates),
+                    Stream.merge(
+                      environmentThemeUpdates,
+                      Stream.merge(usageLimitSourceUpdates, p2pUpdates),
+                    ),
                   ),
                 ),
               );
