@@ -231,7 +231,6 @@ export function makeAcpContentDeltaEvent(input: {
   readonly threadId: ThreadId;
   readonly turnId: TurnId | undefined;
   readonly itemId?: string;
-  readonly streamKind?: "assistant_text" | "reasoning_text";
   readonly text: string;
   readonly rawPayload: unknown;
 }): ProviderRuntimeEvent {
