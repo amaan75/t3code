@@ -21,13 +21,30 @@ import { DEFAULT_SIGNAL_EXPORT } from "@t3tools/shared/observability";
 import * as OtelEnvironment from "@t3tools/shared/otelEnvironment";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { deriveServerPaths } from "../config.ts";
-import { resolveServerConfig } from "./config.ts";
+import { resolveServerConfig, type CliServerFlags } from "./config.ts";
 
 const deriveExplicitServerPaths = (baseDir: string, devUrl: URL | undefined) =>
   deriveServerPaths(baseDir, devUrl, { baseDirIsExplicit: true });
 
 const encodeDesktopBootstrap = Schema.encodeEffect(Schema.fromJsonString(DesktopBackendBootstrap));
 const encodeUnknownJson = Schema.encodeEffect(Schema.fromJsonString(Schema.Unknown));
+
+const minimalWebFlags = (baseDir: string): CliServerFlags => ({
+  mode: Option.some("web"),
+  port: Option.some(3773),
+  host: Option.none(),
+  baseDir: Option.some(baseDir),
+  cwd: Option.none(),
+  devUrl: Option.none(),
+  noBrowser: Option.none(),
+  bootstrapFd: Option.none(),
+  autoBootstrapProjectFromCwd: Option.none(),
+  logWebSocketEvents: Option.none(),
+  tailscaleServeEnabled: Option.none(),
+  tailscaleServePort: Option.none(),
+  p2pEnabled: Option.none(),
+  p2pBootstrap: Option.none(),
+});
 
 const makeDesktopBootstrap = (
   overrides: Partial<DesktopBackendBootstrapValue> = {},
@@ -827,6 +844,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          p2pEnabled: Option.none(),
+          p2pBootstrap: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -877,6 +896,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          p2pEnabled: Option.none(),
+          p2pBootstrap: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -1137,21 +1158,6 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
       expect(resolved.otlpLogsUrl).toBe("http://collector.internal:4318/v1/logs");
     }),
   );
-
-  const minimalWebFlags = (baseDir: string) => ({
-    mode: Option.some("web" as const),
-    port: Option.some(3773),
-    host: Option.none<string>(),
-    baseDir: Option.some(baseDir),
-    cwd: Option.none<string>(),
-    devUrl: Option.none<URL>(),
-    noBrowser: Option.none<boolean>(),
-    bootstrapFd: Option.none<number>(),
-    autoBootstrapProjectFromCwd: Option.none<boolean>(),
-    logWebSocketEvents: Option.none<boolean>(),
-    tailscaleServeEnabled: Option.none<boolean>(),
-    tailscaleServePort: Option.none<number>(),
-  });
 
   it.effect(
     "resolves each signal's endpoint through T3CODE_OTLP_*_URL, an OTEL endpoint, the bootstrap envelope, and persisted Settings, in that order",
