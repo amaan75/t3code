@@ -145,6 +145,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         logWebSocketEvents: Option.none<boolean>(),
         tailscaleServeEnabled: Option.none<boolean>(),
         tailscaleServePort: Option.none<number>(),
+        p2pEnabled: Option.none(),
+        p2pBootstrap: Option.none(),
       };
       const layerConfig = ConfigProvider.layer(
         ConfigProvider.fromEnv({
@@ -189,6 +191,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
         logWebSocketEvents: Option.none<boolean>(),
         tailscaleServeEnabled: Option.none<boolean>(),
         tailscaleServePort: Option.none<number>(),
+        p2pEnabled: Option.none(),
+        p2pBootstrap: Option.none(),
       };
       const layerConfig = ConfigProvider.layer(
         ConfigProvider.fromEnv({ env: { T3CODE_DEV_AUTH_TOKEN: secret } }),
@@ -979,6 +983,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          p2pEnabled: Option.none(),
+          p2pBootstrap: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -1022,6 +1028,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          p2pEnabled: Option.none(),
+          p2pBootstrap: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -1067,6 +1075,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          p2pEnabled: Option.none(),
+          p2pBootstrap: Option.none(),
         },
         Option.none(),
       ).pipe(
@@ -1107,6 +1117,8 @@ it.layer(NodeServices.layer)("cli config resolution", (it) => {
           logWebSocketEvents: Option.none(),
           tailscaleServeEnabled: Option.none(),
           tailscaleServePort: Option.none(),
+          p2pEnabled: Option.none(),
+          p2pBootstrap: Option.none(),
         },
         Option.none(),
       ).pipe(
