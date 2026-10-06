@@ -10,7 +10,11 @@ import * as NodeHttp from "node:http";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import * as NodeServices from "@effect/platform-node/NodeServices";
-import { EnvironmentHttpApi, type RepositoryIdentity } from "@t3tools/contracts";
+import {
+  EnvironmentHttpApi,
+  type RepositoryIdentity,
+  type ServerSettings as ServerSettingsValue,
+} from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Duration from "effect/Duration";
 import * as Deferred from "effect/Deferred";
@@ -133,6 +137,7 @@ import {
   managedTunnelStartupAction,
   retryManagedTunnelRegistration,
 } from "./cloud/managedTunnelStartup.ts";
+import * as P2pEndpointRuntime from "./remoteAccess/P2pEndpointRuntime.ts";
 import * as CloudCliTokenManager from "./cloud/CliTokenManager.ts";
 import * as CloudCliState from "./cloud/CliState.ts";
 import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
@@ -454,6 +459,10 @@ const layerScheduledTaskWebhookOrigin = Layer.effect(
   }),
 );
 
+const layerP2pEndpointRuntime = P2pEndpointRuntime.layer.pipe(
+  Layer.provide(ServerSecretStore.layer),
+);
+
 const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
   Layer.provide(layerScheduledTaskWebhookOrigin),
   Layer.provide(ProviderEventIngestor.layerAnalytics),
@@ -619,6 +628,7 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
         Layer.provide(ExternalLauncher.layer),
       ),
       layerCloudManagedEndpointRuntime,
+      layerP2pEndpointRuntime,
     ),
   ),
 );
@@ -691,6 +701,7 @@ const layerMakeServer = Layer.unwrap(
     const layerActivation = Layer.succeed(ServerActivation.ServerActivation, awaitActivation);
     const runtimeStateParked = yield* Deferred.make<void>();
     const tailscaleParked = yield* Deferred.make<void>();
+    const p2pParked = yield* Deferred.make<void>();
     const cloudLinkParked = yield* Deferred.make<void>();
     const routesReady = yield* Deferred.make<void>();
     const layerLauncher = ServiceLauncherClient.layer;
@@ -791,6 +802,45 @@ const layerMakeServer = Layer.unwrap(
           ),
         )
       : Layer.empty;
+    // Announces on the DHT when either the --p2p flag/env or the persisted
+    // setting asks for it, and follows setting changes at runtime. The flag
+    // forces announcing on; the flag's bootstrap list outranks the setting's.
+    const layerP2pEndpoint = Layer.effectDiscard(
+      Effect.gen(function* () {
+        yield* Deferred.succeed(p2pParked, undefined).pipe(Effect.orDie);
+        yield* awaitActivation;
+        const server = yield* HttpServer.HttpServer;
+        const address = server.address;
+        if (typeof address === "string" || !("port" in address)) {
+          return;
+        }
+        const targetPort = address.port;
+        const runtime = yield* P2pEndpointRuntime.P2pEndpointRuntime;
+        const settingsService = yield* ServerSettings.ServerSettingsService;
+        yield* Effect.addFinalizer(() => runtime.disable);
+
+        const reconcile = (settings: ServerSettingsValue) => {
+          const enabled = config.p2pEnabled || settings.remoteAccess.p2pEnabled;
+          if (!enabled) {
+            return runtime.disable;
+          }
+          const bootstrap =
+            config.p2pBootstrap.length > 0
+              ? config.p2pBootstrap
+              : settings.remoteAccess.p2pBootstrap;
+          return runtime.ensure({ targetPort, bootstrap }).pipe(Effect.asVoid);
+        };
+
+        const changes = yield* settingsService.subscribeChanges;
+        yield* settingsService.getSettings.pipe(
+          Effect.flatMap(reconcile),
+          Effect.catch((cause) =>
+            Effect.logWarning("Failed to reconcile the P2P endpoint from settings", { cause }),
+          ),
+        );
+        yield* changes.pipe(Stream.runForEach(reconcile), Effect.forkScoped);
+      }),
+    );
     const layerCloudDesiredLinkReconcile = Layer.effectDiscard(
       Effect.gen(function* () {
         const cloudLink = yield* CloudLink.CloudLink;
@@ -1017,6 +1067,7 @@ const layerMakeServer = Layer.unwrap(
           Deferred.await(cloudLinkParked),
           Deferred.await(routesReady),
           ...(config.tailscaleServeEnabled ? [Deferred.await(tailscaleParked)] : []),
+          Deferred.await(p2pParked),
         ],
         { concurrency: "unbounded" },
       ).pipe(Effect.asVoid),
@@ -1034,6 +1085,7 @@ const layerMakeServer = Layer.unwrap(
       layerHttpListening,
       layerRuntimeState.pipe(Layer.provide(layerLauncher)),
       layerTailscaleServe,
+      layerP2pEndpoint,
       layerCloudDesiredLinkReconcile,
       HeapSnapshot.layer,
     );

@@ -23,6 +23,7 @@ import { AppState } from "react-native";
 
 import { authClientMetadata } from "../lib/authClientMetadata";
 import * as Runtime from "../lib/runtime";
+import { makeMobileP2pEnvironmentGateway } from "../p2p/gateway";
 import * as MobileStorage from "../persistence/mobile-storage";
 import { appAtomRegistry } from "../state/atom-registry";
 import { clearThreadOutboxEnvironment } from "../state/thread-outbox-removal";
@@ -158,6 +159,7 @@ const layerWakeups = Wakeups.layer({
 const layerCapabilities = Layer.effectContext(
   Effect.gen(function* () {
     const storage = yield* MobileStorage.MobileStorage;
+    const p2pGateway = yield* makeMobileP2pEnvironmentGateway;
     return Context.make(
       ClientCapabilities.CloudSession,
       ClientCapabilities.CloudSession.of({
@@ -239,6 +241,7 @@ const layerCapabilities = Layer.effectContext(
           disconnect: () => Effect.void,
         }),
       ),
+      Context.add(ClientCapabilities.P2pEnvironmentGateway, p2pGateway),
     );
   }),
 );

@@ -94,6 +94,8 @@ it.effect("parks automatic pull until activation without delaying command readin
           logWebSocketEvents: false,
           tailscaleServeEnabled: false,
           tailscaleServePort: 443,
+          p2pEnabled: false,
+          p2pBootstrap: [],
           mode: "desktop",
           cwd,
           host: "localhost",

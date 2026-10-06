@@ -15,6 +15,22 @@ class CatalogDependencyResolutionError extends Schema.TaggedError<CatalogDepende
 }
 
 /**
+ * Package name from a pnpm override selector.
+ *
+ * Handles nested selectors (`parent>child`) and versioned package keys
+ * (`undici@^8`, `@scope/pkg@1`) the way bare `catalog:` does: look up the
+ * catalog entry for the package the selector ends in.
+ */
+export function catalogPackageNameFromOverrideKey(name: string): string {
+  const target = name.split(">").at(-1) ?? name;
+  if (target.startsWith("@")) {
+    const scoped = target.match(/^(@[^/]+\/[^@]+)/);
+    return scoped?.[1] ?? target;
+  }
+  return target.replace(/@.*$/, "") || target;
+}
+
+/**
  * Resolve `catalog:` dependency specs using the workspace catalog.
  *
  * Pure function: returns a new record with every `catalog:…` value replaced by
@@ -32,10 +48,11 @@ export function resolveCatalogDependencies(
       }
 
       const catalogKey = spec.slice("catalog:".length).trim();
-      // An override key can be a selector such as `@scope/parent>effect`; like
-      // pnpm, a bare `catalog:` there means the catalog entry of the package
-      // the selector ends in.
-      const lookupKey = catalogKey.length > 0 ? catalogKey : (name.split(">").at(-1) ?? name);
+      // An override key can be a selector such as `@scope/parent>effect` or
+      // `undici@^8`; like pnpm, a bare `catalog:` there means the catalog
+      // entry of the package the selector ends in.
+      const lookupKey =
+        catalogKey.length > 0 ? catalogKey : catalogPackageNameFromOverrideKey(name);
       const resolved = catalog[lookupKey];
 
       if (typeof resolved !== "string" || resolved.length === 0) {

@@ -332,12 +332,46 @@ const layerCapabilities = Layer.effectContext(
         });
       }),
     });
+    const p2p = ClientCapabilities.P2pEnvironmentGateway.of({
+      prepare: Effect.fn("web.connectionPlatform.p2p.prepare")(function* (input) {
+        const ensure = window.desktopBridge?.ensureP2pEnvironment;
+        if (ensure === undefined) {
+          return yield* new ConnectionBlockedError({
+            reason: "unsupported",
+            detail: "P2P environments are only available in the desktop and mobile apps.",
+          });
+        }
+        return yield* Effect.tryPromise({
+          try: () => ensure(input),
+          catch: (cause) =>
+            new ConnectionTransientError({
+              reason: "remote-unavailable",
+              detail: `Could not open the P2P tunnel: ${String(cause)}`,
+            }),
+        });
+      }),
+      disconnect: Effect.fn("web.connectionPlatform.p2p.disconnect")(function* (publicKeyZ32) {
+        const disconnect = window.desktopBridge?.disconnectP2pEnvironment;
+        if (disconnect === undefined) {
+          return;
+        }
+        yield* Effect.tryPromise({
+          try: () => disconnect(publicKeyZ32),
+          catch: (cause) =>
+            new ConnectionTransientError({
+              reason: "remote-unavailable",
+              detail: `Could not disconnect the P2P environment: ${String(cause)}`,
+            }),
+        });
+      }),
+    });
 
     return Context.make(ClientCapabilities.CloudSession, cloudSession).pipe(
       Context.add(ClientCapabilities.PrimaryEnvironmentAuth, primaryAuth),
       Context.add(ClientCapabilities.RelayDeviceIdentity, identity),
       Context.add(ClientCapabilities.ClientPresentation, presentation),
       Context.add(ClientCapabilities.SshEnvironmentGateway, ssh),
+      Context.add(ClientCapabilities.P2pEnvironmentGateway, p2p),
     );
   }),
 );

@@ -81,6 +81,8 @@ const makeConfig = (baseDir: string) =>
       logWebSocketEvents: false,
       tailscaleServeEnabled: false,
       tailscaleServePort: 443,
+      p2pEnabled: false,
+      p2pBootstrap: [],
     } satisfies ServerConfig.ServerConfig["Service"];
   });
 

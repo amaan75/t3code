@@ -414,6 +414,10 @@ const makeHarness = Effect.fn("TestEnvironmentRegistry.makeHarness")(function* (
       yield* session.ready;
       return { prepared, session };
     });
+  const p2pGateway = ClientCapabilities.P2pEnvironmentGateway.of({
+    prepare: () => Effect.die(new Error("P2P preparation is not used.")),
+    disconnect: () => Effect.void,
+  });
   const driver = ConnectionDriver.ConnectionDriver.of({
     connect: (entry, reportProgress) =>
       reportProgress({ stage: "preparing" }).pipe(
@@ -438,6 +442,7 @@ const makeHarness = Effect.fn("TestEnvironmentRegistry.makeHarness")(function* (
         Layer.succeed(ConnectionCredentialStore.ConnectionCredentialStore, credentialStore),
         Layer.succeed(TokenStore.RemoteDpopAccessTokenStore, tokenStore),
         Layer.succeed(ClientCapabilities.SshEnvironmentGateway, sshGateway),
+        Layer.succeed(ClientCapabilities.P2pEnvironmentGateway, p2pGateway),
         Layer.succeed(Connectivity.Connectivity, connectivity),
         Layer.succeed(
           ConnectionWakeups.ConnectionWakeups,
