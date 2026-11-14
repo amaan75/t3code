@@ -1,6 +1,7 @@
 import {
   OrchestrationV2AppThread,
   OrchestrationV2TurnItem,
+  type OrchestrationV2ThreadEntryPin,
   type OrchestrationV2ThreadProjection,
   type ScopedThreadRef,
 } from "@t3tools/contracts";
@@ -48,6 +49,7 @@ const EMPTY_VISIBLE_TURN_ITEMS: OrchestrationV2ThreadProjection["visibleTurnItem
 const EMPTY_THREAD_STRUCTURE_TURN_ITEMS: ReadonlyArray<ThreadStructureVisibleTurnItem> =
   Object.freeze([]);
 const EMPTY_CHECKPOINT_SUMMARIES: ReadonlyArray<ThreadCheckpointSummary> = Object.freeze([]);
+const EMPTY_ENTRY_PINS: ReadonlyArray<OrchestrationV2ThreadEntryPin> = Object.freeze([]);
 
 /**
  * Changes when the agent may have changed the workspace, so file views and host images refresh.
@@ -89,6 +91,26 @@ type AppThread = OrchestrationV2ThreadProjection["thread"];
 // structure changes, which the incremental timeline relies on.
 const structureTurnItems = new WeakMap<TurnItem, ThreadStructureTurnItem>();
 const structureVisibleTurnItems = new WeakMap<VisibleTurnItem, ThreadStructureVisibleTurnItem>();
+
+// Queued text, attachments and attribution all come from the message, so its identity covers them.
+function queueWorkflowStatesEqual(
+  left: ThreadQueueWorkflowState,
+  right: ThreadQueueWorkflowState,
+): boolean {
+  return (
+    left.activeRun === right.activeRun &&
+    left.isHeld === right.isHeld &&
+    left.canSendNow === right.canSendNow &&
+    left.canPromoteToSteer === right.canPromoteToSteer &&
+    left.promoteSkipsCompaction === right.promoteSkipsCompaction &&
+    left.queuedRuns.length === right.queuedRuns.length &&
+    left.queuedRuns.every(
+      (queued, index) =>
+        queued.run === right.queuedRuns[index]!.run &&
+        queued.message === right.queuedRuns[index]!.message,
+    )
+  );
+}
 
 function toThreadStructureTurnItem(item: TurnItem): ThreadStructureTurnItem {
   if (item.type !== "assistant_message" && item.type !== "reasoning") return item;
@@ -397,7 +419,8 @@ export function createEnvironmentThreadDetailAtoms<E>(
         projection.providerSessions !== previous.providerSessions ||
         projection.providerTurns !== previous.providerTurns
       ) {
-        value = deriveThreadQueueWorkflowState(projection);
+        const next = deriveThreadQueueWorkflowState(projection);
+        if (value === null || !queueWorkflowStatesEqual(value, next)) value = next;
         const { thread, runs, messages, providerThreads, providerSessions, providerTurns } =
           projection;
         previous = { thread, runs, messages, providerThreads, providerSessions, providerTurns };
@@ -481,8 +504,16 @@ export function createEnvironmentThreadDetailAtoms<E>(
         projection.messages !== previous?.messages
       ) {
         const { checkpoints, messages } = projection;
+        const next = deriveThreadCheckpointSummaries({ checkpoints, messages });
+        // The same checkpoints give the same summaries; messages only pick each assistant message.
+        if (
+          checkpoints !== previous?.checkpoints ||
+          next.some(
+            (summary, index) => summary.assistantMessageId !== value[index]?.assistantMessageId,
+          )
+        )
+          value = next;
         previous = { checkpoints, messages };
-        value = deriveThreadCheckpointSummaries(previous);
       }
       return value;
     }).pipe(Atom.setIdleTTL(0), Atom.withLabel(`environment-thread-checkpoint-summaries:${key}`));
@@ -493,6 +524,14 @@ export function createEnvironmentThreadDetailAtoms<E>(
       (get) =>
         Option.getOrNull(get(threadStateValueAtomFamily(key)).data)?.thread.lastVisitedAt ?? null,
     ).pipe(Atom.setIdleTTL(0), Atom.withLabel(`environment-thread-last-visited:${key}`)),
+  );
+  // Thread events replace the thread, so this holds through streamed text.
+  const entryPinsAtomFamily = Atom.family((key: string) =>
+    Atom.make(
+      (get): ReadonlyArray<OrchestrationV2ThreadEntryPin> =>
+        Option.getOrNull(get(threadStateValueAtomFamily(key)).data)?.thread.entryPins ??
+        EMPTY_ENTRY_PINS,
+    ).pipe(Atom.setIdleTTL(0), Atom.withLabel(`environment-thread-entry-pins:${key}`)),
   );
   const updatedAtAtomFamily = Atom.family((key: string) =>
     Atom.make(
@@ -580,6 +619,7 @@ export function createEnvironmentThreadDetailAtoms<E>(
       workspaceMutationIdAtomFamily(threadKey(ref)),
     updatedAtAtom: (ref: ScopedThreadRef) => updatedAtAtomFamily(threadKey(ref)),
     lastVisitedAtAtom: (ref: ScopedThreadRef) => lastVisitedAtAtomFamily(threadKey(ref)),
+    entryPinsAtom: (ref: ScopedThreadRef) => entryPinsAtomFamily(threadKey(ref)),
     pendingRequestsAtom: (ref: ScopedThreadRef) => pendingRequestsAtomFamily(threadKey(ref)),
     queueWorkflowAtom: (ref: ScopedThreadRef) => queueWorkflowAtomFamily(threadKey(ref)),
     queuedCountAtom: (ref: ScopedThreadRef) => queuedCountAtomFamily(threadKey(ref)),
