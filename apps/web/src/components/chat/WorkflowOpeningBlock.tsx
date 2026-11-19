@@ -1,3 +1,4 @@
+import { T, useGT, useMessages } from "gt-react";
 import { useAtomValue } from "@effect/atom-react";
 import {
   isTerminalSubagentStatus,
@@ -23,7 +24,8 @@ import { Button } from "../ui/button";
 import { Tooltip, TooltipTrigger } from "../ui/tooltip";
 import { AgentElapsed } from "./AgentElapsed";
 import { findRevealRef } from "./markdownFindContext";
-import { shouldCollapseUserMessage } from "./MessagesTimeline.logic";
+import { useExpandRevealedEntry } from "./entryReveal";
+import { useTallEnoughToFold } from "./useTallEnoughToFold";
 import { SubagentTooltipContent } from "./SubagentTooltipContent";
 import { EnvironmentSubagentAvatar } from "./V2LifecycleRow";
 
@@ -40,9 +42,11 @@ export function WorkflowOpeningBlock(props: {
   readonly environmentId: EnvironmentId;
   readonly onOpenThread: (threadId: string) => void;
 }) {
+  const gt = useGT();
   const { opening } = props;
+  const m = useMessages();
   const providers = useAtomValue(providersIgnoringCheckedAtAtom(props.environmentId));
-  const headline = workflowOpeningHeadline(opening);
+  const headline = workflowOpeningHeadline(opening, m);
   const phases = opening.group?.phases.filter((phase) => phase.members.length > 0) ?? [];
   const memberRow = (member: RuntimeSubagent) =>
     opening.providerInstanceId === null ? null : (
@@ -58,14 +62,16 @@ export function WorkflowOpeningBlock(props: {
     );
   return (
     <section
-      aria-label={`Workflow started: ${headline.title}`}
+      aria-label={gt("Workflow started: {title}", { title: headline.title })}
       className="flex min-w-0 flex-col gap-3 px-1 py-0.5"
       data-workflow-opening
     >
       <header className="flex min-w-0 items-start gap-2">
         <WorkflowIcon aria-hidden className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <p className="text-2xs font-medium text-muted-foreground">Workflow started</p>
+          <p className="text-2xs font-medium text-muted-foreground">
+            <T>Workflow started</T>
+          </p>
           <h3 className="truncate text-sm font-medium text-foreground" data-thread-find-text="true">
             {headline.title}
           </h3>
@@ -82,7 +88,7 @@ export function WorkflowOpeningBlock(props: {
         ) : null}
       </header>
       {phases.map((phase) => (
-        <section key={phase.index} aria-label={`${phase.title} phase`}>
+        <section key={phase.index} aria-label={gt("{title} phase", { title: phase.title })}>
           <h4 className="flex items-baseline gap-2 px-2 pb-0.5 text-2xs font-medium text-muted-foreground">
             <span className="min-w-0 truncate" data-thread-find-text="true">
               {phase.title}
@@ -97,7 +103,7 @@ export function WorkflowOpeningBlock(props: {
       {opening.group && opening.group.unphasedMembers.length > 0 ? (
         <ul className="m-0 list-none p-0">{opening.group.unphasedMembers.map(memberRow)}</ul>
       ) : null}
-      <WorkflowScript script={opening.script} />
+      <WorkflowScript entryId={opening.messageId} script={opening.script} />
     </section>
   );
 }
@@ -110,6 +116,7 @@ function WorkflowMemberRow(props: {
   readonly driver: ProviderDriverKind | undefined;
   readonly onOpenThread: (threadId: string) => void;
 }) {
+  const gt = useGT();
   const { member } = props;
   const threadId = member.childThreadId;
   const failed = member.status === "failed";
@@ -134,7 +141,7 @@ function WorkflowMemberRow(props: {
             ) : (
               <button
                 type="button"
-                aria-label={`Open ${member.title}`}
+                aria-label={gt("Open {title}", { title: member.title })}
                 aria-description={member.status}
                 onClick={() => props.onOpenThread(threadId)}
                 className={cn(
@@ -201,10 +208,13 @@ function WorkflowMemberRow(props: {
   );
 }
 
-function WorkflowScript(props: { readonly script: string }) {
+function WorkflowScript(props: { readonly entryId: string; readonly script: string }) {
+  const revealExpansion = useExpandRevealedEntry(props.entryId);
+  const gt = useGT();
   const [expanded, setExpanded] = useState(false);
+  if (revealExpansion && !expanded) setExpanded(true);
   const revealRef = findRevealRef(() => setExpanded(true));
-  const canFold = shouldCollapseUserMessage(props.script);
+  const { ref: contentRef, tallEnough: canFold } = useTallEnoughToFold();
   const folded = canFold && !expanded;
   return (
     <div>
@@ -219,7 +229,9 @@ function WorkflowScript(props: { readonly script: string }) {
             : undefined
         }
       >
-        <ChatMarkdown text={scriptMarkdown(props.script)} cwd={undefined} />
+        <div ref={contentRef}>
+          <ChatMarkdown text={scriptMarkdown(props.script)} cwd={undefined} />
+        </div>
       </div>
       {canFold ? (
         <div className="-ms-1">
@@ -231,7 +243,7 @@ function WorkflowScript(props: { readonly script: string }) {
             data-scroll-anchor-ignore
             onClick={() => setExpanded((value) => !value)}
           >
-            {expanded ? "Show less" : "Show full script"}
+            {expanded ? gt("Show less") : gt("Show full script")}
           </Button>
         </div>
       ) : null}
